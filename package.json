@@ -1,0 +1,13 @@
+{
+  "name": "g1-guess-the-song",
+  "version": "1.0.0",
+  "description": "Guess the Song - Real-time Multiplayer Phone-based Music Game",
+  "main": "backend/server.js",
+  "scripts": {
+    "build": "npm --prefix frontend install && npm --prefix frontend run build && npm --prefix backend install --production",
+    "start": "node backend/server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
