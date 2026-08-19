@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { io } from 'socket.io-client';
+import HomePage from './components/HomePage';
 import PlayerScreen from './components/PlayerScreen';
 import HostDashboard from './components/HostDashboard';
 import './index.css';
 
-// In production the frontend is served FROM the backend, so we connect to the same origin.
-// In local dev, Vite runs on :5173 and backend on :3000.
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 
 function App() {
@@ -42,12 +41,16 @@ function App() {
     <Router>
       {!connected && (
         <div className="connection-banner">
-          ⚡ Reconnecting...
+          ⚡ Reconnecting to game server...
         </div>
       )}
       <Routes>
         <Route
           path="/"
+          element={<HomePage socket={socket} gameState={gameState} />}
+        />
+        <Route
+          path="/play"
           element={<PlayerScreen socket={socket} gameState={gameState} playerState={playerState} />}
         />
         <Route

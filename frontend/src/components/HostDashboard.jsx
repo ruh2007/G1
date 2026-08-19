@@ -10,9 +10,76 @@ export default function HostDashboard({ socket, hostState }) {
     correct: '', audioUrl: ''
   });
 
+  const [isAdminAuth, setIsAdminAuth] = useState(
+    () => sessionStorage.getItem('admin_authenticated') === 'true'
+  );
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminError, setAdminError] = useState('');
+
   useEffect(() => {
-    if (socket) socket.emit('join_host');
-  }, [socket]);
+    if (socket && isAdminAuth) socket.emit('join_host');
+  }, [socket, isAdminAuth]);
+
+  const handleAdminLogin = (e) => {
+    e.preventDefault();
+    setAdminError('');
+    if (adminEmail.trim().toLowerCase() === 'arc@gmail.com' && adminPassword === 'arcgame') {
+      sessionStorage.setItem('admin_authenticated', 'true');
+      setIsAdminAuth(true);
+    } else {
+      setAdminError('Invalid Admin credentials. Access denied.');
+    }
+  };
+
+  const handleAdminLogout = () => {
+    sessionStorage.removeItem('admin_authenticated');
+    setIsAdminAuth(false);
+  };
+
+  if (!isAdminAuth) {
+    return (
+      <div className="host-container flex-center">
+        <div className="panel" style={{ maxWidth: '440px', width: '100%', padding: '2rem' }}>
+          <div className="text-center mb-4">
+            <span className="logo-badge" style={{ fontSize: '2rem', padding: '10px 16px' }}>👑</span>
+          </div>
+          <h2 className="text-center mb-4" style={{ fontSize: '1.6rem' }}>Admin Host Login</h2>
+          <p className="text-muted text-center" style={{ fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+            Please log in with your administrator credentials to access the game dashboard.
+          </p>
+
+          {adminError && <div className="alert-banner error" style={{ marginBottom: '1rem' }}>{adminError}</div>}
+
+          <form onSubmit={handleAdminLogin} className="flex-col" style={{ gap: '1rem' }}>
+            <div>
+              <label className="input-label">ADMIN EMAIL</label>
+              <input
+                type="email"
+                placeholder="arc@gmail.com"
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="input-label">ADMIN PASSWORD</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                required
+              />
+            </div>
+            <button type="submit" className="btn-primary btn-glow" style={{ padding: '14px', marginTop: '0.5rem', background: 'linear-gradient(135deg, #7c3aed, #ff2a5f)' }}>
+              👑 UNLOCK DASHBOARD
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   if (!socket) {
     return (
@@ -88,6 +155,9 @@ export default function HostDashboard({ socket, hostState }) {
             <span className="stat-label">Question</span>
             <span className="stat-value">{currentQuestionIndex + 1} / {totalQuestions}</span>
           </div>
+          <button onClick={handleAdminLogout} style={{ width: 'auto', background: 'rgba(255,23,68,0.15)', border: '1px solid rgba(255,23,68,0.3)', color: 'var(--error)', padding: '8px 14px', fontSize: '0.85rem' }}>
+            🚪 Logout Admin
+          </button>
         </div>
       </div>
 

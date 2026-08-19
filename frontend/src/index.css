@@ -573,3 +573,125 @@ input::placeholder { color: var(--text-muted); }
   from { transform: translateY(-100%); }
   to   { transform: translateY(0); }
 }
+
+/* ─── Home Page Styles ─── */
+.home-container {
+  max-width: 900px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 3rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hero-section {
+  margin-bottom: 2rem;
+}
+
+.home-tabs {
+  display: flex;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 6px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tab-btn {
+  width: auto;
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tab-btn.active {
+  background: var(--accent-primary);
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 42, 95, 0.35);
+}
+
+.tab-btn.admin-tab.active {
+  background: linear-gradient(135deg, #7c3aed, #ff2a5f);
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+}
+
+.input-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.alert-banner {
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.alert-banner.error {
+  background: rgba(255, 23, 68, 0.15);
+  border: 1px solid rgba(255, 23, 68, 0.35);
+  color: var(--error);
+}
+
+.alert-banner.success {
+  background: rgba(0, 230, 118, 0.15);
+  border: 1px solid rgba(0, 230, 118, 0.35);
+  color: var(--success);
+}
+
+.home-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+  width: 100%;
+  margin-top: 3rem;
+}
+
+.feature-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  text-align: center;
+  backdrop-filter: blur(12px);
+}
+
+.feature-icon {
+  font-size: 2.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.feature-card h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.4rem;
+}
+
+.feature-card p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
