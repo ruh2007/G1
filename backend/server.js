@@ -4,7 +4,16 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const { initGameLogic } = require('./gameLogic');
+
+// Prevent crashes from uncaught errors
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION:', reason);
+});
 
 const app = express();
 
@@ -28,7 +37,12 @@ app.get('/api/health', (_req, res) => {
 // ─── Fallback: serve React app for all non-API routes ───
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/')) return;
-  res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
+  const indexPath = path.join(FRONTEND_DIST, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(200).send('<h1>Guess the Song Backend</h1><p>Backend is online!</p>');
+  }
 });
 
 const server = http.createServer(app);
@@ -39,13 +53,11 @@ const io = new Server(server, {
     origin: ALLOWED_ORIGIN,
     methods: ['GET', 'POST']
   },
-  // Optimised transport: try WebSocket first, fall back to polling
   transports: ['websocket', 'polling'],
-  // Tuned for up to 500 concurrent clients
   pingTimeout: 20000,
   pingInterval: 15000,
   upgradeTimeout: 10000,
-  maxHttpBufferSize: 1e6, // 1 MB max message
+  maxHttpBufferSize: 1e6,
 });
 
 initGameLogic(io);
