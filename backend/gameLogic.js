@@ -22,8 +22,8 @@ class GameState {
     this.status = 'LOBBY';
     this.currentQuestionIndex = 0;
     this.questionStartTime = null;
-    this.players = new Map();      // uuid -> Player
-    this.socketToUuid = new Map(); // socketId -> uuid
+    this.players = new Map();
+    this.socketToUuid = new Map();
     this.songs = loadSongs();
     this._audioTimer = null;
     this._lockTimer = null;
@@ -59,30 +59,89 @@ class GameState {
 
 let gameState = new GameState();
 
-// ─── Throttled host broadcast: max 1 update per 200 ms ───
-let hostBroadcastTimer = null;
-function scheduleHostBroadcast(io) {
-  if (hostBroadcastTimer) return;
-  hostBroadcastTimer = setTimeout(() => {
-    io.to('host_room').emit('host_state_update', getHostGameState());
-    hostBroadcastTimer = null;
-  }, 200);
-}
-
 function initGameLogic(io) {
-  const answerRateLimit = makeRateLimiter(3, 5000); // 3 submissions per 5 s per socket
-  const actionRateLimit = makeRateLimiter(10, 5000); // host: 10 actions per 5 s
+  const answerRateLimit = makeRateLimiter(3, 5000);
+  const actionRateLimit = makeRateLimiter(10, 5000);
+
+  // ─── State builders (defined first so scheduleHostBroadcast can use them) ───
+
+  function getPublicGameState() {
+    const currentSong = gameState.songs[gameState.currentQuestionIndex];
+    if (!currentSong) return { status: gameState.status, error: 'No songs loaded' };
+
+    const publicSong = {
+      id: currentSong.id,
+      difficulty: currentSong.difficulty,
+      audioUrl: currentSong.audioUrl,
+      options: currentSong.options,
+    };
+
+    if (['RESULTS', 'LEADERBOARD', 'FINAL_RESULTS'].includes(gameState.status)) {
+      publicSong.title  = currentSong.title;
+      publicSong.artist = currentSong.artist;
+    }
+
+    const state = {
+      status: gameState.status,
+      currentQuestionIndex: gameState.currentQuestionIndex,
+      totalQuestions: gameState.songs.length,
+      playerCount: gameState.players.size,
+      song: publicSong,
+    };
+
+    if (['LEADERBOARD', 'FINAL_RESULTS'].includes(gameState.status)) {
+      const lb = gameState.getLeaderboard();
+      state.top10 = lb.slice(0, 10).map(p => ({ name: p.name, score: p.score, uuid: p.uuid }));
+    }
+
+    return state;
+  }
+
+  function getHostGameState() {
+    const qIndex = gameState.currentQuestionIndex;
+    let answersReceived = 0;
+    gameState.players.forEach(p => { if (p.answers[qIndex]) answersReceived++; });
+    const allPlayers = Array.from(gameState.players.values());
+    const connected  = allPlayers.filter(p => p.connected).length;
+
+    return {
+      status: gameState.status,
+      currentQuestionIndex: qIndex,
+      totalQuestions: gameState.songs.length,
+      playerCount: allPlayers.length,
+      connectedPlayers: connected,
+      answersReceived,
+      currentSong: gameState.songs[qIndex],
+      leaderboard: gameState.getLeaderboard().slice(0, 10).map(p => ({
+        uuid: p.uuid,
+        name: p.name,
+        score: p.score,
+        correctAnswers: p.correctAnswers,
+        rank: p.rank,
+      })),
+    };
+  }
+
+  // ─── Throttled host broadcast (max 1 update per 200 ms) ───
+  let hostBroadcastTimer = null;
+  function scheduleHostBroadcast() {
+    if (hostBroadcastTimer) return;
+    hostBroadcastTimer = setTimeout(() => {
+      io.to('host_room').emit('host_state_update', getHostGameState());
+      hostBroadcastTimer = null;
+    }, 200);
+  }
+
+  // ─── Socket handlers ─────────────────────────────────────────────────────
 
   io.on('connection', (socket) => {
     console.log(`[+] ${socket.id}`);
 
-    // ── Host joins dedicated room ──
     socket.on('join_host', () => {
       socket.join('host_room');
       socket.emit('host_state_update', getHostGameState());
     });
 
-    // ── Host actions ──
     socket.on('host_action', (data) => {
       if (!actionRateLimit(socket.id)) return;
       const { action, payload } = data || {};
@@ -92,18 +151,7 @@ function initGameLogic(io) {
           if (!payload || !payload.title || !payload.options || !payload.correctAnswer) return;
           const newId = gameState.songs.length > 0
             ? Math.max(...gameState.songs.map(s => s.id)) + 1 : 1;
-          const newSong = { id: newId, ...payload };
-          gameState.songs.push(newSong);
-          saveSongs(gameState.songs);
-          // Only broadcast the count change, not the full state
-          io.emit('game_state_update', getPublicGameState());
-          break;
-        }
-
-        case 'DELETE_SONG': {
-          const { id } = payload || {};
-          if (!id) return;
-          gameState.songs = gameState.songs.filter(s => s.id !== id);
+          gameState.songs.push({ id: newId, ...payload });
           saveSongs(gameState.songs);
           io.emit('game_state_update', getPublicGameState());
           break;
@@ -120,19 +168,16 @@ function initGameLogic(io) {
           if (gameState.status !== 'QUESTION_READY') return;
           gameState.status = 'AUDIO_PLAYING';
           io.emit('game_state_update', getPublicGameState());
-
-          // 3-second audio window, then open answers for 10 s
           gameState._audioTimer = setTimeout(() => {
             if (gameState.status !== 'AUDIO_PLAYING') return;
             gameState.status = 'ANSWERING';
             gameState.questionStartTime = Date.now();
             io.emit('game_state_update', getPublicGameState());
-
             gameState._lockTimer = setTimeout(() => {
               if (gameState.status === 'ANSWERING') {
                 gameState.status = 'ANSWERS_LOCKED';
                 io.emit('game_state_update', getPublicGameState());
-                scheduleHostBroadcast(io);
+                scheduleHostBroadcast();
               }
             }, 10000);
           }, 3000);
@@ -181,10 +226,9 @@ function initGameLogic(io) {
           break;
       }
 
-      scheduleHostBroadcast(io);
+      scheduleHostBroadcast();
     });
 
-    // ── Player joins ──
     socket.on('join_game', (data) => {
       const { playerName, uuid } = data || {};
       if (!playerName || !uuid) return;
@@ -193,12 +237,12 @@ function initGameLogic(io) {
         gameState.players.set(uuid, {
           uuid,
           socketId: socket.id,
-          name: String(playerName).slice(0, 30), // max 30 chars
+          name: String(playerName).slice(0, 30),
           score: 0,
           correctAnswers: 0,
           totalAnswerTime: 0,
           answers: {},
-          connected: true
+          connected: true,
         });
       } else {
         const p = gameState.players.get(uuid);
@@ -209,10 +253,9 @@ function initGameLogic(io) {
       gameState.socketToUuid.set(socket.id, uuid);
       socket.emit('game_state_update', getPublicGameState());
       socket.emit('player_update', gameState.players.get(uuid));
-      scheduleHostBroadcast(io);
+      scheduleHostBroadcast();
     });
 
-    // ── Answer submission ──
     socket.on('submit_answer', (data) => {
       if (!answerRateLimit(socket.id)) return;
       const { answer, uuid } = data || {};
@@ -223,15 +266,14 @@ function initGameLogic(io) {
       if (!player) return;
 
       const qIndex = gameState.currentQuestionIndex;
-      if (player.answers[qIndex]) return; // already answered
+      if (player.answers[qIndex]) return;
 
       const timeInSecs = (Date.now() - gameState.questionStartTime) / 1000;
-      const isCorrect = gameState.checkAnswer(answer);
+      const isCorrect  = gameState.checkAnswer(answer);
       let points = 0;
 
       if (isCorrect) {
         player.correctAnswers++;
-        // Base 100 + speed bonus (max 50)
         const speedBonus = Math.max(0, Math.round(50 * (1 - timeInSecs / 10)));
         points = 100 + speedBonus;
       }
@@ -242,20 +284,19 @@ function initGameLogic(io) {
 
       socket.emit('answer_receipt', { success: true, points });
       socket.emit('player_update', player);
-      scheduleHostBroadcast(io);
+      scheduleHostBroadcast();
 
-      // If everyone has answered, auto-lock
-      const connected = Array.from(gameState.players.values()).filter(p => p.connected);
-      const answered  = connected.filter(p => p.answers[qIndex]);
-      if (answered.length >= connected.length && gameState.status === 'ANSWERING') {
+      // Auto-lock when every connected player has answered
+      const connectedPlayers = Array.from(gameState.players.values()).filter(p => p.connected);
+      const answered = connectedPlayers.filter(p => p.answers[qIndex]);
+      if (answered.length >= connectedPlayers.length && gameState.status === 'ANSWERING') {
         gameState.clearTimers();
         gameState.status = 'ANSWERS_LOCKED';
         io.emit('game_state_update', getPublicGameState());
-        scheduleHostBroadcast(io);
+        scheduleHostBroadcast();
       }
     });
 
-    // ── Disconnect ──
     socket.on('disconnect', () => {
       console.log(`[-] ${socket.id}`);
       const uuid = gameState.socketToUuid.get(socket.id);
@@ -264,76 +305,14 @@ function initGameLogic(io) {
         if (p) p.connected = false;
         gameState.socketToUuid.delete(socket.id);
       }
-      scheduleHostBroadcast(io);
+      scheduleHostBroadcast();
     });
 
-    // ── Send current state on connect / reconnect ──
+    // Send current state immediately on connect
     socket.emit('game_state_update', getPublicGameState());
     const existingUuid = gameState.socketToUuid.get(socket.id);
-    if (existingUuid) {
-      socket.emit('player_update', gameState.players.get(existingUuid));
-    }
+    if (existingUuid) socket.emit('player_update', gameState.players.get(existingUuid));
   });
-
-  // ─── State builders ───────────────────────────────────────────────────────
-
-  function getPublicGameState() {
-    const currentSong = gameState.songs[gameState.currentQuestionIndex];
-    if (!currentSong) return { status: gameState.status, error: 'No songs loaded' };
-
-    const publicSong = {
-      id: currentSong.id,
-      difficulty: currentSong.difficulty,
-      audioUrl: currentSong.audioUrl,
-      options: currentSong.options,
-    };
-
-    // Reveal title/artist only after answering phase
-    if (['RESULTS', 'LEADERBOARD', 'FINAL_RESULTS'].includes(gameState.status)) {
-      publicSong.title  = currentSong.title;
-      publicSong.artist = currentSong.artist;
-    }
-
-    const state = {
-      status: gameState.status,
-      currentQuestionIndex: gameState.currentQuestionIndex,
-      totalQuestions: gameState.songs.length,
-      playerCount: gameState.players.size,
-      song: publicSong,
-    };
-
-    if (['LEADERBOARD', 'FINAL_RESULTS'].includes(gameState.status)) {
-      const lb = gameState.getLeaderboard();
-      state.top10 = lb.slice(0, 10).map(p => ({ name: p.name, score: p.score, uuid: p.uuid }));
-    }
-
-    return state;
-  }
-
-  function getHostGameState() {
-    const qIndex = gameState.currentQuestionIndex;
-    let answersReceived = 0;
-    gameState.players.forEach(p => { if (p.answers[qIndex]) answersReceived++; });
-    const allPlayers = Array.from(gameState.players.values());
-    const connected  = allPlayers.filter(p => p.connected).length;
-
-    return {
-      status: gameState.status,
-      currentQuestionIndex: qIndex,
-      totalQuestions: gameState.songs.length,
-      playerCount: allPlayers.length,
-      connectedPlayers: connected,
-      answersReceived,
-      currentSong: gameState.songs[qIndex],
-      leaderboard: gameState.getLeaderboard().slice(0, 10).map(p => ({
-        uuid: p.uuid,
-        name: p.name,
-        score: p.score,
-        correctAnswers: p.correctAnswers,
-        rank: p.rank,
-      })),
-    };
-  }
 }
 
 module.exports = { initGameLogic };

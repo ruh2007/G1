@@ -8,9 +8,9 @@ export default defineConfig(({ mode }) => ({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          socketio: ['socket.io-client'],
+        manualChunks(id) {
+          if (id.includes('socket.io-client')) return 'socketio';
+          if (id.includes('node_modules')) return 'vendor';
         },
       },
     },
