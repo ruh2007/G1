@@ -7,7 +7,7 @@ import HostDashboard from './components/HostDashboard';
 import DisplayScreen from './components/DisplayScreen';
 import './index.css';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
+import { SOCKET_URL } from './config';
 
 function App() {
   const socketRef = useRef(null);
@@ -18,13 +18,20 @@ function App() {
   const [connected, setConnected]     = useState(false);
 
   useEffect(() => {
-    const s = io(SOCKET_URL, {
+    const socketOptions = {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000,
-    });
+    };
+
+    // If SOCKET_URL has a subpath like /ori/api, pass it appropriately
+    if (import.meta.env.VITE_SOCKET_PATH) {
+      socketOptions.path = import.meta.env.VITE_SOCKET_PATH;
+    }
+
+    const s = io(SOCKET_URL, socketOptions);
 
     socketRef.current = s;
     setSocket(s);

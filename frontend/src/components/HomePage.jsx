@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getApiUrl } from '../config';
 
 export default function HomePage({ socket }) {
   const navigate = useNavigate();
@@ -32,7 +33,7 @@ export default function HomePage({ socket }) {
     setAdminError('');
 
     try {
-      const response = await fetch('/api/admin/login', {
+      const response = await fetch(getApiUrl('/api/admin/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: adminEmail, password: adminPassword }),

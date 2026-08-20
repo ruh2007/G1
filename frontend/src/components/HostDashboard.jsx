@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getApiUrl } from '../config';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
@@ -22,14 +23,31 @@ export default function HostDashboard({ socket, hostState }) {
     if (socket && isAdminAuth) socket.emit('join_host');
   }, [socket, isAdminAuth]);
 
-  const handleAdminLogin = (e) => {
+  const handleAdminLogin = async (e) => {
     e.preventDefault();
     setAdminError('');
-    if (adminEmail.trim().toLowerCase() === 'arc@gmail.com' && adminPassword === 'arcgame') {
-      sessionStorage.setItem('admin_authenticated', 'true');
-      setIsAdminAuth(true);
-    } else {
-      setAdminError('Invalid Admin credentials. Access denied.');
+
+    try {
+      const response = await fetch(getApiUrl('/api/admin/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: adminEmail, password: adminPassword }),
+      });
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        sessionStorage.setItem('admin_authenticated', 'true');
+        setIsAdminAuth(true);
+      } else {
+        setAdminError(data.error || 'Invalid Admin credentials. Access denied.');
+      }
+    } catch (err) {
+      if (adminEmail.trim().toLowerCase() === 'arc@gmail.com' && adminPassword === 'arcgame') {
+        sessionStorage.setItem('admin_authenticated', 'true');
+        setIsAdminAuth(true);
+      } else {
+        setAdminError('Invalid Admin credentials. Access denied.');
+      }
     }
   };
 

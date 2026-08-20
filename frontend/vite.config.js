@@ -16,6 +16,8 @@ export default defineConfig(({ mode }) => ({
     },
   },
   server: {
+    port: 4342,
+    host: true,
     // In local dev, proxy Socket.IO + API calls to the backend
     proxy: {
       '/socket.io': {
