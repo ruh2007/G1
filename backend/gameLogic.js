@@ -171,6 +171,7 @@ async function initGameLogic(io) {
             const newId = gameState.songs.length > 0 ? Math.max(...gameState.songs.map(s => Number(s.id) || 0)) + 1 : 1;
             gameState.songs.push({ id: newId, ...payload });
           }
+          await saveSongs(gameState.songs);
           io.emit('game_state_update', getPublicGameState());
           break;
         }
@@ -178,14 +179,21 @@ async function initGameLogic(io) {
         case 'DELETE_SONG': {
           const { songId } = payload || {};
           if (songId === undefined) return;
-          gameState.songs = gameState.songs.filter(s => (s.id || s._id?.toString()) !== String(songId));
+          
+          const targetSong = gameState.songs.find(s => String(s.id || s._id) === String(songId));
+          const songTitle = targetSong ? targetSong.title : null;
+
+          gameState.songs = gameState.songs.filter(s => String(s.id || s._id) !== String(songId));
+          
           if (gameState.songs.length === 0) {
             gameState.status = 'LOBBY';
             gameState.currentQuestionIndex = 0;
           } else if (gameState.currentQuestionIndex >= gameState.songs.length) {
             gameState.currentQuestionIndex = Math.max(0, gameState.songs.length - 1);
           }
-          await deleteSongById(songId);
+          
+          await deleteSongById(songId, songTitle);
+          await saveSongs(gameState.songs);
           io.emit('game_state_update', getPublicGameState());
           break;
         }

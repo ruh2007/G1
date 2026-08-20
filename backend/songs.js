@@ -56,12 +56,24 @@ async function saveSongs(songsArray) {
   }
 }
 
-async function deleteSongById(songId) {
+async function deleteSongById(songId, songTitle = null) {
   try {
     if (mongoose.connection.readyState !== 1) throw new Error('MongoDB not connected');
-    await Song.findByIdAndDelete(songId);
+    
+    if (songId && mongoose.isValidObjectId(songId)) {
+      await Song.findByIdAndDelete(songId);
+      console.log(`🗑️ Deleted song by _id: ${songId}`);
+    } else {
+      const filters = [];
+      if (songId) filters.push({ id: songId });
+      if (songTitle) filters.push({ title: songTitle });
+      if (filters.length > 0) {
+        const res = await Song.deleteMany({ $or: filters });
+        console.log(`🗑️ Deleted ${res.deletedCount} song(s) from MongoDB`);
+      }
+    }
   } catch (err) {
-    console.warn('MongoDB unavailable for deleteSongById:', err.message);
+    console.warn('MongoDB deleteSongById failed:', err.message);
   }
 }
 
