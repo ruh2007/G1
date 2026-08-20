@@ -112,6 +112,13 @@ function initGameLogic(io) {
       connectedPlayers: connected,
       answersReceived,
       currentSong: gameState.songs[qIndex],
+      allSongs: gameState.songs.map(s => ({
+        id: s.id,
+        title: s.title,
+        artist: s.artist,
+        difficulty: s.difficulty,
+        correctAnswer: s.correctAnswer
+      })),
       leaderboard: gameState.getLeaderboard().slice(0, 10).map(p => ({
         uuid: p.uuid,
         name: p.name,
@@ -153,6 +160,38 @@ function initGameLogic(io) {
             ? Math.max(...gameState.songs.map(s => s.id)) + 1 : 1;
           gameState.songs.push({ id: newId, ...payload });
           saveSongs(gameState.songs);
+          io.emit('game_state_update', getPublicGameState());
+          break;
+        }
+
+        case 'DELETE_SONG': {
+          const { songId } = payload || {};
+          if (songId === undefined) return;
+          gameState.songs = gameState.songs.filter(s => s.id !== songId);
+          if (gameState.songs.length === 0) {
+            gameState.status = 'LOBBY';
+            gameState.currentQuestionIndex = 0;
+          } else if (gameState.currentQuestionIndex >= gameState.songs.length) {
+            gameState.currentQuestionIndex = Math.max(0, gameState.songs.length - 1);
+          }
+          saveSongs(gameState.songs);
+          io.emit('game_state_update', getPublicGameState());
+          break;
+        }
+
+        case 'RESET_POINTS': {
+          gameState.players.forEach((p) => {
+            p.score = 0;
+            p.correctAnswers = 0;
+            p.totalAnswerTime = 0;
+            p.answers = {};
+          });
+          gameState.players.forEach((p) => {
+            if (p.socketId) {
+              const socketObj = io.sockets.sockets.get(p.socketId);
+              if (socketObj) socketObj.emit('player_update', p);
+            }
+          });
           io.emit('game_state_update', getPublicGameState());
           break;
         }

@@ -4,6 +4,7 @@ const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
 export default function HostDashboard({ socket, hostState }) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showSongList, setShowSongList] = useState(false);
   const [newSong, setNewSong] = useState({
     title: '', artist: '', difficulty: 'Medium',
     opt1: '', opt2: '', opt3: '', opt4: '',
@@ -129,8 +130,21 @@ export default function HostDashboard({ socket, hostState }) {
     connectedPlayers,
     answersReceived,
     currentSong,
+    allSongs,
     leaderboard
   } = hostState;
+
+  const handleDeleteSong = (songId, title) => {
+    if (window.confirm(`Delete song "${title}"?`)) {
+      socket.emit('host_action', { action: 'DELETE_SONG', payload: { songId } });
+    }
+  };
+
+  const handleResetPoints = () => {
+    if (window.confirm("Are you sure you want to reset ALL player scores to 0?")) {
+      socket.emit('host_action', { action: 'RESET_POINTS' });
+    }
+  };
 
   const progressPct = totalQuestions > 0 ? ((currentQuestionIndex) / totalQuestions) * 100 : 0;
   const top3 = leaderboard?.slice(0, 3) || [];
@@ -304,11 +318,39 @@ export default function HostDashboard({ socket, hostState }) {
             <p className="text-muted">Game is in the lobby. Start the game to begin Question 1.</p>
           )}
 
-          {/* Add Song Button */}
-          <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-            <button onClick={() => setShowAddForm(!showAddForm)} style={{ background: showAddForm ? 'var(--error)' : 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: 'none', fontSize: '0.85rem' }}>
-              {showAddForm ? '✕ CANCEL' : '➕ ADD NEW SONG'}
-            </button>
+          {/* Add Song & Manage Songs Controls */}
+          <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => { setShowAddForm(!showAddForm); setShowSongList(false); }} style={{ background: showAddForm ? 'var(--error)' : 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: 'none', fontSize: '0.85rem' }}>
+                {showAddForm ? '✕ CANCEL' : '➕ ADD NEW SONG'}
+              </button>
+              <button onClick={() => { setShowSongList(!showSongList); setShowAddForm(false); }} style={{ background: showSongList ? 'var(--accent-primary)' : 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: 'none', fontSize: '0.85rem' }}>
+                {showSongList ? '✕ HIDE LIST' : `🎵 MANAGE SONGS (${allSongs?.length || totalQuestions})`}
+              </button>
+            </div>
+
+            {/* Song List Management */}
+            {showSongList && (
+              <div className="panel" style={{ background: 'rgba(0,0,0,0.25)', padding: '1rem', marginTop: '8px' }}>
+                <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', color: 'var(--text-muted)' }}>ALL SONGS ({allSongs?.length || 0})</h4>
+                <ul className="leaderboard-list">
+                  {allSongs?.map((song, idx) => (
+                    <li key={song.id || idx} className="leaderboard-item" style={{ padding: '8px 12px', fontSize: '0.85rem' }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '8px' }}>
+                        <strong>{idx + 1}. {song.title}</strong>
+                        <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>by {song.artist}</span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteSong(song.id, song.title)}
+                        style={{ width: 'auto', background: 'rgba(255,23,68,0.2)', color: 'var(--error)', border: '1px solid rgba(255,23,68,0.4)', padding: '4px 10px', fontSize: '0.75rem' }}
+                      >
+                        🗑️ Delete
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {showAddForm && (
               <form onSubmit={handleAddSong} className="add-song-form">
@@ -389,6 +431,20 @@ export default function HostDashboard({ socket, hostState }) {
               <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '1rem', textAlign: 'center' }}>
                 Showing top 10 of {leaderboard.length} players
               </p>
+
+              <button
+                onClick={handleResetPoints}
+                style={{
+                  marginTop: '1rem',
+                  background: 'rgba(255, 149, 0, 0.15)',
+                  border: '1px solid rgba(255, 149, 0, 0.35)',
+                  color: '#ff9500',
+                  fontSize: '0.85rem',
+                  padding: '8px 14px'
+                }}
+              >
+                🔄 RESET PLAYER POINTS
+              </button>
             </div>
           ) : (
             <p className="text-muted">Leaderboard will appear once players have answered.</p>
