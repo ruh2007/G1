@@ -6,6 +6,12 @@ const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 export default function HostDashboard({ socket, hostState }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showSongList, setShowSongList] = useState(false);
+  const [editingSongId, setEditingSongId] = useState(null);
+  const [editSongForm, setEditSongForm] = useState({
+    title: '', artist: '', difficulty: 'Medium',
+    opt1: '', opt2: '', opt3: '', opt4: '',
+    correct: '', audioUrl: ''
+  });
   const [newSong, setNewSong] = useState({
     title: '', artist: '', difficulty: 'Medium',
     opt1: '', opt2: '', opt3: '', opt4: '',
@@ -151,6 +157,40 @@ export default function HostDashboard({ socket, hostState }) {
     allSongs,
     leaderboard
   } = hostState;
+
+  const handleStartEditSong = (song) => {
+    setEditingSongId(song.id);
+    const opts = song.options || [];
+    setEditSongForm({
+      title: song.title || '',
+      artist: song.artist || '',
+      difficulty: song.difficulty || 'Medium',
+      opt1: opts[0] || '',
+      opt2: opts[1] || '',
+      opt3: opts[2] || '',
+      opt4: opts[3] || '',
+      correct: song.correctAnswer || '',
+      audioUrl: song.audioUrl || '/audio/placeholder.mp3'
+    });
+  };
+
+  const handleSaveEditSong = (e) => {
+    e.preventDefault();
+    if (!editingSongId) return;
+    const payload = {
+      songId: editingSongId,
+      songData: {
+        title: editSongForm.title,
+        artist: editSongForm.artist,
+        difficulty: editSongForm.difficulty,
+        options: [editSongForm.opt1, editSongForm.opt2, editSongForm.opt3, editSongForm.opt4],
+        correctAnswer: editSongForm.correct,
+        audioUrl: editSongForm.audioUrl || '/audio/placeholder.mp3'
+      }
+    };
+    socket.emit('host_action', { action: 'EDIT_SONG', payload });
+    setEditingSongId(null);
+  };
 
   const handleDeleteSong = (songId, title) => {
     if (window.confirm(`Delete song "${title}"?`)) {
@@ -358,18 +398,64 @@ export default function HostDashboard({ socket, hostState }) {
                 <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', color: 'var(--text-muted)' }}>ALL SONGS ({allSongs?.length || 0})</h4>
                 <ul className="leaderboard-list">
                   {allSongs?.map((song, idx) => (
-                    <li key={song.id || idx} className="leaderboard-item" style={{ padding: '8px 12px', fontSize: '0.85rem' }}>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '8px' }}>
-                        <strong>{idx + 1}. {song.title}</strong>
-                        <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>by {song.artist}</span>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteSong(song.id, song.title)}
-                        style={{ width: 'auto', background: 'rgba(255,23,68,0.2)', color: 'var(--error)', border: '1px solid rgba(255,23,68,0.4)', padding: '4px 10px', fontSize: '0.75rem' }}
-                      >
-                        🗑️ Delete
-                      </button>
-                    </li>
+                    <React.Fragment key={song.id || idx}>
+                      <li className="leaderboard-item" style={{ padding: '8px 12px', fontSize: '0.85rem' }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '8px' }}>
+                          <strong>{idx + 1}. {song.title}</strong>
+                          <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>by {song.artist}</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', shrink: 0 }}>
+                          <button
+                            onClick={() => handleStartEditSong(song)}
+                            style={{ width: 'auto', background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', padding: '4px 10px', fontSize: '0.75rem' }}
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSong(song.id, song.title)}
+                            style={{ width: 'auto', background: 'rgba(255,23,68,0.2)', color: 'var(--error)', border: '1px solid rgba(255,23,68,0.4)', padding: '4px 10px', fontSize: '0.75rem' }}
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
+                      </li>
+
+                      {/* Inline Edit Form */}
+                      {editingSongId === song.id && (
+                        <li style={{ background: 'rgba(124,58,237,0.15)', border: '1px solid var(--accent-primary)', borderRadius: '8px', padding: '12px', marginBottom: '8px' }}>
+                          <form onSubmit={handleSaveEditSong} className="add-song-form" style={{ gap: '8px' }}>
+                            <h5 style={{ margin: '0 0 6px 0', fontSize: '0.85rem', color: 'var(--accent-primary)' }}>✏️ EDIT SONG #{idx + 1}</h5>
+                            <div className="form-row">
+                              <input placeholder="Song Title *" value={editSongForm.title} onChange={e => setEditSongForm({ ...editSongForm, title: e.target.value })} required />
+                              <input placeholder="Artist *" value={editSongForm.artist} onChange={e => setEditSongForm({ ...editSongForm, artist: e.target.value })} required />
+                            </div>
+                            <div className="form-row">
+                              <input placeholder="Option A *" value={editSongForm.opt1} onChange={e => setEditSongForm({ ...editSongForm, opt1: e.target.value })} required />
+                              <input placeholder="Option B *" value={editSongForm.opt2} onChange={e => setEditSongForm({ ...editSongForm, opt2: e.target.value })} required />
+                            </div>
+                            <div className="form-row">
+                              <input placeholder="Option C *" value={editSongForm.opt3} onChange={e => setEditSongForm({ ...editSongForm, opt3: e.target.value })} required />
+                              <input placeholder="Option D *" value={editSongForm.opt4} onChange={e => setEditSongForm({ ...editSongForm, opt4: e.target.value })} required />
+                            </div>
+                            <input placeholder="Correct Answer *" value={editSongForm.correct} onChange={e => setEditSongForm({ ...editSongForm, correct: e.target.value })} required />
+                            <div className="form-row">
+                              <select value={editSongForm.difficulty} onChange={e => setEditSongForm({ ...editSongForm, difficulty: e.target.value })} style={{ background: 'var(--bg-panel)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '10px' }}>
+                                <option>Very Easy</option>
+                                <option>Easy</option>
+                                <option>Medium</option>
+                                <option>Hard</option>
+                                <option>Very Hard</option>
+                              </select>
+                              <input placeholder="Audio URL" value={editSongForm.audioUrl} onChange={e => setEditSongForm({ ...editSongForm, audioUrl: e.target.value })} />
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                              <button type="submit" className="btn-primary" style={{ padding: '8px', fontSize: '0.85rem' }}>💾 SAVE CHANGES</button>
+                              <button type="button" onClick={() => setEditingSongId(null)} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', padding: '8px', fontSize: '0.85rem', width: 'auto' }}>CANCEL</button>
+                            </div>
+                          </form>
+                        </li>
+                      )}
+                    </React.Fragment>
                   ))}
                 </ul>
               </div>

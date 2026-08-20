@@ -88,4 +88,21 @@ async function addSong(songData) {
   }
 }
 
-module.exports = { loadSongs, saveSongs, deleteSongById, addSong };
+async function updateSongById(songId, songData) {
+  try {
+    if (mongoose.connection.readyState !== 1) throw new Error('MongoDB not connected');
+    const { id, _id, __v, ...updateFields } = songData;
+    if (songId && mongoose.isValidObjectId(songId)) {
+      const doc = await Song.findByIdAndUpdate(songId, updateFields, { new: true }).lean();
+      if (doc) return { ...doc, id: doc._id.toString() };
+    } else {
+      const doc = await Song.findOneAndUpdate({ id: songId }, updateFields, { new: true }).lean();
+      if (doc) return { ...doc, id: doc._id.toString() };
+    }
+  } catch (err) {
+    console.warn('MongoDB updateSongById failed:', err.message);
+  }
+  return null;
+}
+
+module.exports = { loadSongs, saveSongs, deleteSongById, addSong, updateSongById };

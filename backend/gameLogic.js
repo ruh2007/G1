@@ -1,4 +1,4 @@
-const { loadSongs, saveSongs, deleteSongById, addSong } = require('./songs');
+const { loadSongs, saveSongs, deleteSongById, addSong, updateSongById } = require('./songs');
 const { upsertPlayer, saveGameResults } = require('./playerDb');
 
 // ─── Rate-limit helper ───────────────────────────────────────────────────────
@@ -125,7 +125,9 @@ async function initGameLogic(io) {
         title:         s.title,
         artist:        s.artist,
         difficulty:    s.difficulty,
+        options:       s.options,
         correctAnswer: s.correctAnswer,
+        audioUrl:      s.audioUrl,
       })),
       leaderboard: gameState.getLeaderboard().slice(0, 10).map(p => ({
         uuid:           p.uuid,
@@ -173,6 +175,23 @@ async function initGameLogic(io) {
           }
           await saveSongs(gameState.songs);
           io.emit('game_state_update', getPublicGameState());
+          break;
+        }
+
+        case 'EDIT_SONG': {
+          const { songId, songData } = payload || {};
+          if (!songId || !songData) return;
+          const idx = gameState.songs.findIndex(s => String(s.id || s._id) === String(songId));
+          if (idx !== -1) {
+            gameState.songs[idx] = {
+              ...gameState.songs[idx],
+              ...songData,
+              id: gameState.songs[idx].id || gameState.songs[idx]._id,
+            };
+            await updateSongById(songId, gameState.songs[idx]);
+            await saveSongs(gameState.songs);
+            io.emit('game_state_update', getPublicGameState());
+          }
           break;
         }
 
