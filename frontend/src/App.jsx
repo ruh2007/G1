@@ -39,7 +39,13 @@ function App() {
     s.on('connect',    ()      => setConnected(true));
     s.on('disconnect', ()      => setConnected(false));
     s.on('game_state_update', setGameState);
-    s.on('player_update',     setPlayerState);
+    s.on('player_update', (data) => {
+      // Persist server-assigned name (with #XXXX tag) so reconnects reuse it
+      if (data?.name) {
+        localStorage.setItem('player_name', data.name);
+      }
+      setPlayerState(data);
+    });
     s.on('host_state_update', setHostState);
 
     return () => s.disconnect();

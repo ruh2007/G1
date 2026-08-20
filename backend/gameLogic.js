@@ -1,5 +1,5 @@
 const { loadSongs, saveSongs, deleteSongById, addSong, updateSongById } = require('./songs');
-const { upsertPlayer, saveGameResults } = require('./playerDb');
+const { upsertPlayer, saveGameResults, removePlayer, updatePlayerScore } = require('./playerDb');
 
 // ─── Rate-limit helper ───────────────────────────────────────────────────────
 function makeRateLimiter(maxCalls, windowMs) {
@@ -129,6 +129,13 @@ async function initGameLogic(io) {
         correctAnswer: s.correctAnswer,
         audioUrl:      s.audioUrl,
       })),
+      playersList: Array.from(gameState.players.values()).map(p => ({
+        uuid:           p.uuid,
+        name:           p.name,
+        score:          p.score,
+        connected:      p.connected,
+        correctAnswers: p.correctAnswers,
+      })),
       leaderboard: gameState.getLeaderboard().slice(0, 10).map(p => ({
         uuid:           p.uuid,
         name:           p.name,
@@ -232,6 +239,26 @@ async function initGameLogic(io) {
           break;
         }
 
+        case 'REMOVE_PLAYER':
+        case 'KICK_PLAYER': {
+          const { uuid } = payload || {};
+          if (!uuid) return;
+          const player = gameState.players.get(uuid);
+          if (player) {
+            const playerSocket = io.sockets.sockets.get(player.socketId);
+            if (playerSocket) {
+              playerSocket.emit('player_kicked', { message: 'You have been removed from the game by the host.' });
+            }
+            gameState.players.delete(uuid);
+            if (player.socketId) gameState.socketToUuid.delete(player.socketId);
+            // Remove from DB
+            removePlayer(uuid);
+            io.emit('game_state_update', getPublicGameState());
+            scheduleHostBroadcast();
+          }
+          break;
+        }
+
         case 'START_GAME':
           if (gameState.status !== 'LOBBY') return;
           gameState.status = 'QUESTION_READY';
@@ -315,11 +342,16 @@ async function initGameLogic(io) {
       const { playerName, uuid } = data || {};
       if (!playerName || !uuid) return;
 
+      const rawName = String(playerName).trim().slice(0, 24);
+      const hasTag = /#\d{4}$/.test(rawName);
+      const randomTag = `#${Math.floor(1000 + Math.random() * 9000)}`;
+      const formattedName = hasTag ? rawName : `${rawName} ${randomTag}`;
+
       if (!gameState.players.has(uuid)) {
         gameState.players.set(uuid, {
           uuid,
           socketId: socket.id,
-          name: String(playerName).slice(0, 30),
+          name: formattedName,
           score: 0,
           correctAnswers: 0,
           totalAnswerTime: 0,
@@ -332,13 +364,15 @@ async function initGameLogic(io) {
         p.connected = true;
       }
 
+      const activePlayer = gameState.players.get(uuid);
+
       gameState.socketToUuid.set(socket.id, uuid);
 
       // Persist/update player in MongoDB
-      upsertPlayer(uuid, String(playerName).slice(0, 30));
+      upsertPlayer(uuid, activePlayer.name);
 
       socket.emit('game_state_update', getPublicGameState());
-      socket.emit('player_update', gameState.players.get(uuid));
+      socket.emit('player_update', activePlayer);
       scheduleHostBroadcast();
     });
 
@@ -368,6 +402,11 @@ async function initGameLogic(io) {
       player.score += points;
       player.totalAnswerTime += timeInSecs;
 
+      // Persist live score to DB on every correct answer
+      if (isCorrect) {
+        updatePlayerScore(player.uuid, player.score, player.correctAnswers);
+      }
+
       socket.emit('answer_receipt', { success: true, points });
       socket.emit('player_update', player);
       scheduleHostBroadcast();
@@ -388,7 +427,11 @@ async function initGameLogic(io) {
       const uuid = gameState.socketToUuid.get(socket.id);
       if (uuid) {
         const p = gameState.players.get(uuid);
-        if (p) p.connected = false;
+        if (p) {
+          p.connected = false;
+          // Update lastSeenAt on disconnect
+          upsertPlayer(uuid, p.name);
+        }
         gameState.socketToUuid.delete(socket.id);
       }
       scheduleHostBroadcast();

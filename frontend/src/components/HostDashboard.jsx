@@ -6,6 +6,7 @@ const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 export default function HostDashboard({ socket, hostState }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showSongList, setShowSongList] = useState(false);
+  const [showPlayersList, setShowPlayersList] = useState(false);
   const [editingSongId, setEditingSongId] = useState(null);
   const [editSongForm, setEditSongForm] = useState({
     title: '', artist: '', difficulty: 'Medium',
@@ -155,6 +156,7 @@ export default function HostDashboard({ socket, hostState }) {
     answersReceived,
     currentSong,
     allSongs,
+    playersList,
     leaderboard
   } = hostState;
 
@@ -195,6 +197,12 @@ export default function HostDashboard({ socket, hostState }) {
   const handleDeleteSong = (songId, title) => {
     if (window.confirm(`Delete song "${title}"?`)) {
       socket.emit('host_action', { action: 'DELETE_SONG', payload: { songId } });
+    }
+  };
+
+  const handleKickPlayer = (uuid, name) => {
+    if (window.confirm(`Remove player "${name}" from the game?`)) {
+      socket.emit('host_action', { action: 'REMOVE_PLAYER', payload: { uuid } });
     }
   };
 
@@ -381,16 +389,47 @@ export default function HostDashboard({ socket, hostState }) {
             <p className="text-muted">Game is in the lobby. Start the game to begin Question 1.</p>
           )}
 
-          {/* Add Song & Manage Songs Controls */}
+          {/* Add Song & Manage Songs & Manage Players Controls */}
           <div style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => { setShowAddForm(!showAddForm); setShowSongList(false); }} style={{ background: showAddForm ? 'var(--error)' : 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: 'none', fontSize: '0.85rem' }}>
-                {showAddForm ? '✕ CANCEL' : '➕ ADD NEW SONG'}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button onClick={() => { setShowAddForm(!showAddForm); setShowSongList(false); setShowPlayersList(false); }} style={{ background: showAddForm ? 'var(--error)' : 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: 'none', fontSize: '0.85rem' }}>
+                {showAddForm ? '✕ CANCEL' : '➕ ADD SONG'}
               </button>
-              <button onClick={() => { setShowSongList(!showSongList); setShowAddForm(false); }} style={{ background: showSongList ? 'var(--accent-primary)' : 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: 'none', fontSize: '0.85rem' }}>
-                {showSongList ? '✕ HIDE LIST' : `🎵 MANAGE SONGS (${allSongs?.length || totalQuestions})`}
+              <button onClick={() => { setShowSongList(!showSongList); setShowAddForm(false); setShowPlayersList(false); }} style={{ background: showSongList ? 'var(--accent-primary)' : 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: 'none', fontSize: '0.85rem' }}>
+                {showSongList ? '✕ HIDE SONGS' : `🎵 MANAGE SONGS (${allSongs?.length || totalQuestions})`}
+              </button>
+              <button onClick={() => { setShowPlayersList(!showPlayersList); setShowAddForm(false); setShowSongList(false); }} style={{ background: showPlayersList ? '#2563eb' : 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: 'none', fontSize: '0.85rem' }}>
+                {showPlayersList ? '✕ HIDE PLAYERS' : `👥 PLAYERS LIST (${playersList?.length || playerCount})`}
               </button>
             </div>
+
+            {/* Players List Management */}
+            {showPlayersList && (
+              <div className="panel" style={{ background: 'rgba(0,0,0,0.25)', padding: '1rem', marginTop: '8px' }}>
+                <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', color: 'var(--text-muted)' }}>ACTIVE PLAYERS IN ROOM ({playersList?.length || 0})</h4>
+                {playersList && playersList.length > 0 ? (
+                  <ul className="leaderboard-list">
+                    {playersList.map((p, idx) => (
+                      <li key={p.uuid || idx} className="leaderboard-item" style={{ padding: '8px 12px', fontSize: '0.85rem' }}>
+                        <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '8px' }}>
+                          <span style={{ fontSize: '0.7rem', marginRight: '6px' }}>{p.connected ? '🟢' : '🔴'}</span>
+                          <strong>{p.name}</strong>
+                          <span style={{ color: 'var(--text-muted)', marginLeft: '8px', fontSize: '0.8rem' }}>({p.score} pts)</span>
+                        </div>
+                        <button
+                          onClick={() => handleKickPlayer(p.uuid, p.name)}
+                          style={{ width: 'auto', background: 'rgba(255,23,68,0.2)', color: 'var(--error)', border: '1px solid rgba(255,23,68,0.4)', padding: '4px 10px', fontSize: '0.75rem' }}
+                        >
+                          🚫 Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-muted" style={{ fontSize: '0.85rem' }}>No players currently in the room.</p>
+                )}
+              </div>
+            )}
 
             {/* Song List Management */}
             {showSongList && (

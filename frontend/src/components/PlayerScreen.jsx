@@ -25,6 +25,20 @@ export default function PlayerScreen({ socket, gameState, playerState }) {
     }
   }, [socket, joined]);
 
+  // Kicked listener
+  useEffect(() => {
+    if (socket) {
+      const handleKicked = (data) => {
+        localStorage.removeItem('player_name');
+        localStorage.removeItem('player_uuid');
+        alert(data?.message || 'You have been removed from the game.');
+        window.location.href = '/';
+      };
+      socket.on('player_kicked', handleKicked);
+      return () => socket.off('player_kicked', handleKicked);
+    }
+  }, [socket]);
+
   useEffect(() => {
     if (gameState?.status === 'ANSWERING') {
       setSubmitted(false);

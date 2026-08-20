@@ -57,6 +57,39 @@ async function saveGameResults(playersMap, totalQuestions) {
 }
 
 /**
+ * Remove a player from MongoDB (used when host kicks a player).
+ */
+async function removePlayer(uuid) {
+  try {
+    if (mongoose.connection.readyState !== 1) return;
+    await Player.deleteOne({ uuid });
+    console.log(`🚫 Player ${uuid} removed from DB.`);
+  } catch (err) {
+    console.warn('DB: removePlayer failed:', err.message);
+  }
+}
+
+/**
+ * Persist a player's live score mid-game (called after each correct answer).
+ * Uses $max to only update bestScore if current score exceeds it.
+ */
+async function updatePlayerScore(uuid, score, correctAnswers) {
+  try {
+    if (mongoose.connection.readyState !== 1) return;
+    await Player.updateOne(
+      { uuid },
+      {
+        $set: { lastSeenAt: new Date() },
+        $max: { bestScore: score },
+      },
+      { upsert: false }
+    );
+  } catch (err) {
+    // Non-critical — don't warn noisily on every answer
+  }
+}
+
+/**
  * Fetch global leaderboard (all-time best scores) from MongoDB.
  */
 async function getGlobalLeaderboard(limit = 20) {
@@ -73,4 +106,4 @@ async function getGlobalLeaderboard(limit = 20) {
   }
 }
 
-module.exports = { upsertPlayer, saveGameResults, getGlobalLeaderboard };
+module.exports = { upsertPlayer, saveGameResults, removePlayer, updatePlayerScore, getGlobalLeaderboard };

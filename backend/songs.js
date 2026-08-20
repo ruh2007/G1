@@ -47,7 +47,12 @@ async function saveSongs(songsArray) {
     const inserted = await Song.insertMany(
       songsArray.map(({ id, _id, __v, ...rest }) => rest)
     );
-    return inserted.map(s => ({ ...s.toObject(), id: s._id.toString() }));
+    // Always also write JSON as a warm backup
+    const fs   = require('fs');
+    const path = require('path');
+    const saved = inserted.map(s => ({ ...s.toObject(), id: s._id.toString() }));
+    fs.writeFileSync(path.join(__dirname, 'songs.json'), JSON.stringify(saved, null, 2));
+    return saved;
   } catch (err) {
     console.warn('MongoDB unavailable for saveSongs, falling back to JSON:', err.message);
     const fs   = require('fs');
