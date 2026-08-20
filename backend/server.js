@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const http    = require('http');
 const { Server } = require('socket.io');
-const cors    = require('cors');
 const path    = require('path');
 const fs      = require('fs');
 const mongoose = require('mongoose');
@@ -55,9 +54,6 @@ const limiter = rateLimit({
 
 // Apply the rate limiting middleware to all requests
 app.use(limiter);
-
-const ALLOWED_ORIGIN = process.env.FRONTEND_URL || '*';
-app.use(cors({ origin: ALLOWED_ORIGIN, methods: ['GET', 'POST', 'DELETE'] }));
 app.use(express.json());
 
 // ─── Static ───────────────────────────────────────────────────────────────────
@@ -132,7 +128,6 @@ app.get('*', (req, res) => {
 // ─── Socket.IO ───────────────────────────────────────────────────────────────
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: ALLOWED_ORIGIN, methods: ['GET', 'POST'] },
   transports: ['websocket', 'polling'],
   pingTimeout: 20000,
   pingInterval: 15000,
