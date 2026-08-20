@@ -27,14 +27,32 @@ export default function HomePage({ socket }) {
     navigate('/play');
   };
 
-  const handleAdminAuth = (e) => {
+  const handleAdminAuth = async (e) => {
     e.preventDefault();
     setAdminError('');
-    if (adminEmail.trim().toLowerCase() === 'arc@gmail.com' && adminPassword === 'arcgame') {
-      sessionStorage.setItem('admin_authenticated', 'true');
-      navigate('/host');
-    } else {
-      setAdminError('Invalid credentials. Access denied.');
+
+    try {
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: adminEmail, password: adminPassword }),
+      });
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        sessionStorage.setItem('admin_authenticated', 'true');
+        navigate('/host');
+      } else {
+        setAdminError(data.error || 'Invalid credentials. Access denied.');
+      }
+    } catch (err) {
+      // Fallback check if server offline/error
+      if (adminEmail.trim().toLowerCase() === 'arc@gmail.com' && adminPassword === 'arcgame') {
+        sessionStorage.setItem('admin_authenticated', 'true');
+        navigate('/host');
+      } else {
+        setAdminError('Invalid credentials. Access denied.');
+      }
     }
   };
 

@@ -13,11 +13,29 @@ const { getGlobalLeaderboard } = require('./playerDb');
 process.on('uncaughtException',  (err)  => console.error('UNCAUGHT:', err));
 process.on('unhandledRejection', (r)    => console.error('REJECTION:', r));
 
+const Admin = require('./models/Admin');
+const bcrypt = require('bcrypt');
+
 // ─── MongoDB ──────────────────────────────────────────────────────────────────
 const MONGO_URI = process.env.MONGODB_URI;
 if (MONGO_URI) {
   mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
-    .then(() => console.log('✅ MongoDB connected'))
+    .then(async () => {
+      console.log('✅ MongoDB connected');
+      // Seed default admin if not exists
+      try {
+        const adminCount = await Admin.countDocuments();
+        if (adminCount === 0) {
+          const defaultEmail = 'arc@gmail.com';
+          const defaultPass = 'arcgame';
+          const hash = await bcrypt.hash(defaultPass, 10);
+          await Admin.create({ email: defaultEmail, passwordHash: hash });
+          console.log(`👤 Default admin created: ${defaultEmail}`);
+        }
+      } catch (err) {
+        console.warn('⚠️ Admin seed failed:', err.message);
+      }
+    })
     .catch(err => console.warn('⚠️  MongoDB connection failed (running without DB):', err.message));
 } else {
   console.warn('⚠️  MONGODB_URI not set – running without persistent database.');
@@ -56,6 +74,38 @@ app.get('/api/health', (_req, res) => {
     timestamp: new Date().toISOString(),
     db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
   });
+});
+
+// Admin login route
+app.post('/api/admin/login', async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ success: false, error: 'Email and password are required' });
+  }
+
+  // Fallback check if DB is disconnected
+  if (mongoose.connection.readyState !== 1) {
+    if (email.trim().toLowerCase() === 'arc@gmail.com' && password === 'arcgame') {
+      return res.json({ success: true, message: 'Admin authenticated (fallback)' });
+    }
+    return res.status(401).json({ success: false, error: 'Invalid credentials' });
+  }
+
+  try {
+    const admin = await Admin.findOne({ email: email.trim().toLowerCase() });
+    if (!admin) {
+      return res.status(401).json({ success: false, error: 'Invalid credentials' });
+    }
+
+    const isMatch = await admin.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, error: 'Invalid credentials' });
+    }
+
+    res.json({ success: true, message: 'Admin authenticated successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Server error during authentication' });
+  }
 });
 
 // Global all-time leaderboard
