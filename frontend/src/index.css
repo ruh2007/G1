@@ -695,3 +695,69 @@ input::placeholder { color: var(--text-muted); }
   color: var(--text-muted);
   line-height: 1.4;
 }
+
+/* ─── Display Screen Styles (TV / Projector View) ─── */
+.display-container {
+  max-width: 1600px;
+  margin: 0 auto;
+  min-height: 100vh;
+  padding: 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.display-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.display-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.display-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.display-stat-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 8px 18px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.display-grid {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 1.5rem;
+  flex: 1;
+}
+
+@media (max-width: 1000px) {
+  .display-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.display-question-panel {
+  min-height: 520px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1.5px solid var(--border);
+  padding: 2rem;
+}
+
+.display-leaderboard-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1.5px solid var(--border);
+  padding: 1.5rem;
+}

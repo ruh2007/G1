@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import HomePage from './components/HomePage';
 import PlayerScreen from './components/PlayerScreen';
 import HostDashboard from './components/HostDashboard';
+import DisplayScreen from './components/DisplayScreen';
 import './index.css';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
@@ -56,6 +57,10 @@ function App() {
         <Route
           path="/host"
           element={<HostDashboard socket={socket} hostState={hostState} />}
+        />
+        <Route
+          path="/display"
+          element={<DisplayScreen socket={socket} hostState={hostState} gameState={gameState} />}
         />
       </Routes>
     </Router>

@@ -161,6 +161,11 @@ export default function HostDashboard({ socket, hostState }) {
           <span className="status-chip" data-status={status}>{status.replace('_', ' ')}</span>
         </div>
         <div className="host-header-right">
+          <a href="/display" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
+            <button style={{ width: 'auto', background: 'rgba(0,229,255,0.15)', border: '1px solid rgba(0,229,255,0.3)', color: 'var(--accent-secondary)', padding: '8px 14px', fontSize: '0.85rem' }}>
+              📺 Open TV Display
+            </button>
+          </a>
           <div className="stat-badge">
             <span className="stat-label">Players</span>
             <span className="stat-value" style={{ color: 'var(--accent-secondary)' }}>{connectedPlayers ?? playerCount}</span>
