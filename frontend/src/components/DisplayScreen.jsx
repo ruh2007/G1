@@ -44,10 +44,10 @@ export default function DisplayScreen({ socket, hostState, gameState }) {
       {/* Top Banner Header */}
       <header className="display-header">
         <div className="display-brand">
-          <span className="logo-badge" style={{ fontSize: '1.5rem', padding: '8px 14px' }}>🎵</span>
+          <img src="/logo.png" alt="Alumni Relations Cell" className="app-brand-logo" style={{ height: '42px' }} />
           <div>
             <h1 style={{ fontSize: '1.8rem', margin: 0, fontWeight: 900 }}>GUESS THE SONG</h1>
-            <p className="text-muted" style={{ fontSize: '0.85rem', margin: 0 }}>LIVE MAIN AUDIENCE DISPLAY</p>
+            <p className="text-muted" style={{ fontSize: '0.85rem', margin: 0 }}>LIVE AUDIENCE DISPLAY</p>
           </div>
         </div>
 

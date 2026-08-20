@@ -156,7 +156,7 @@ export default function HostDashboard({ socket, hostState }) {
       {/* Header */}
       <div className="host-header">
         <div className="host-header-left">
-          <span className="logo-badge" style={{ fontSize: '1.4rem', padding: '6px 12px' }}>🎵</span>
+          <img src="/logo.png" alt="Alumni Relations Cell" className="app-brand-logo" style={{ height: '36px' }} />
           <h2 style={{ margin: 0, fontWeight: 800, letterSpacing: '-0.5px' }}>GUESS THE SONG</h2>
           <span className="status-chip" data-status={status}>{status.replace('_', ' ')}</span>
         </div>

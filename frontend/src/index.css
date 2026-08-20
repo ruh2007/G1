@@ -761,3 +761,22 @@ input::placeholder { color: var(--text-muted); }
   border: 1.5px solid var(--border);
   padding: 1.5rem;
 }
+
+/* ─── Brand Logo ─── */
+.app-brand-logo {
+  height: 42px;
+  width: auto;
+  object-fit: contain;
+  background: #ffffff;
+  padding: 5px 14px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(255, 255, 255, 0.12);
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.app-brand-logo.large {
+  height: 64px;
+  padding: 8px 20px;
+  border-radius: 16px;
+}

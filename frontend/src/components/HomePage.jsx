@@ -133,12 +133,14 @@ export default function HomePage({ socket, gameState, onAdminLogin }) {
     <div className="home-container">
       {/* Hero Header */}
       <div className="hero-section text-center">
-        <div className="logo-badge" style={{ fontSize: '3rem', padding: '16px 24px', marginBottom: '1rem' }}>🎵</div>
+        <div style={{ marginBottom: '1.25rem' }}>
+          <img src="/logo.png" alt="Alumni Relations Cell" className="app-brand-logo large" />
+        </div>
         <h1 className="title" style={{ fontSize: '3.2rem', marginBottom: '0.5rem', letterSpacing: '-1px' }}>
           GUESS THE SONG
         </h1>
         <p className="text-muted" style={{ fontSize: '1.15rem', maxWidth: '500px', margin: '0 auto 2rem' }}>
-          Live multiplayer music trivia game for up to 500 players!
+          Presented by Alumni Relations Cell
         </p>
       </div>
 
