@@ -1,58 +1,75 @@
 require('dotenv').config();
 const express = require('express');
-const http = require('http');
+const http    = require('http');
 const { Server } = require('socket.io');
-const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
+const cors    = require('cors');
+const path    = require('path');
+const fs      = require('fs');
+const mongoose = require('mongoose');
 const { initGameLogic } = require('./gameLogic');
+const { getGlobalLeaderboard } = require('./playerDb');
 
-// Prevent crashes from uncaught errors
-process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION:', err);
-});
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('UNHANDLED REJECTION:', reason);
-});
+// ─── Fault tolerance ─────────────────────────────────────────────────────────
+process.on('uncaughtException',  (err)  => console.error('UNCAUGHT:', err));
+process.on('unhandledRejection', (r)    => console.error('REJECTION:', r));
 
+// ─── MongoDB ──────────────────────────────────────────────────────────────────
+const MONGO_URI = process.env.MONGODB_URI;
+if (MONGO_URI) {
+  mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
+    .then(() => console.log('✅ MongoDB connected'))
+    .catch(err => console.warn('⚠️  MongoDB connection failed (running without DB):', err.message));
+} else {
+  console.warn('⚠️  MONGODB_URI not set – running without persistent database.');
+}
+
+// ─── Express ──────────────────────────────────────────────────────────────────
 const app = express();
-
-// ─── CORS ───
 const ALLOWED_ORIGIN = process.env.FRONTEND_URL || '*';
-app.use(cors({ origin: ALLOWED_ORIGIN, methods: ['GET', 'POST'] }));
+app.use(cors({ origin: ALLOWED_ORIGIN, methods: ['GET', 'POST', 'DELETE'] }));
 app.use(express.json());
 
-// ─── Serve audio files from /public ───
-app.use('/audio', express.static(path.join(__dirname, 'public/audio')));
+// ─── Static ───────────────────────────────────────────────────────────────────
+app.use('/audio',  express.static(path.join(__dirname, 'public/audio')));
+app.use('/public', express.static(path.join(__dirname, 'public')));
 
-// ─── Serve built frontend in production ───
 const FRONTEND_DIST = path.join(__dirname, '../frontend/dist');
 app.use(express.static(FRONTEND_DIST));
 
-// ─── Health check endpoint ───
+// ─── REST API ─────────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+  });
 });
 
-// ─── Fallback: serve React app for all non-API routes ───
+// Global all-time leaderboard
+app.get('/api/leaderboard', async (_req, res) => {
+  try {
+    const data = await getGlobalLeaderboard(20);
+    res.json({ success: true, leaderboard: data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── Fallback SPA ────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/') || req.path.startsWith('/socket.io/')) return;
   const indexPath = path.join(FRONTEND_DIST, 'index.html');
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {
-    res.status(200).send('<h1>Guess the Song Backend</h1><p>Backend is online!</p>');
+    res.status(200).send('<h1>Guess the Song – Backend Online</h1>');
   }
 });
 
+// ─── Socket.IO ───────────────────────────────────────────────────────────────
 const server = http.createServer(app);
-
-// ─── Socket.IO with production-safe config ───
 const io = new Server(server, {
-  cors: {
-    origin: ALLOWED_ORIGIN,
-    methods: ['GET', 'POST']
-  },
+  cors: { origin: ALLOWED_ORIGIN, methods: ['GET', 'POST'] },
   transports: ['websocket', 'polling'],
   pingTimeout: 20000,
   pingInterval: 15000,
